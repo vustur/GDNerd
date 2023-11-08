@@ -1,11 +1,12 @@
 import openai, json, gd, os, random, asyncio, time, colorama
+import config.py as cfg
 
-openai.api_key = "???"
-openai.api_base = "???"
+openai.api_key = cfg.gptkey
+openai.api_base = cfg.gptbase
 client = gd.Client()
 isLogined = False
 gdchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?-#*()_ :;/"
-waitaftercomment = 15 # how much time in seconds to wait after comment (use if your api limited)
+waitaftercomment = cfg.waitaftercomment
 
 inputClr = colorama.Fore.MAGENTA
 errClr = colorama.Fore.RED
@@ -23,7 +24,7 @@ async def login():
     print("Logining...")
     isLogined = False
     try:
-      await client.login("???", "???")
+      await client.login(cfg.username, cfg.password)
       isLogined = True
       break  # Exit the loop if login is successful
     except Exception as Err:
