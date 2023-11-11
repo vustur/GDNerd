@@ -1,7 +1,6 @@
-import openai, json, gd, os, random, asyncio, time, colorama
+import openai, gd, random, asyncio, time, colorama, os
 import config as cfg
 
-openai.api_base = cfg.gptbase
 client = gd.Client()
 gptclient = openai.OpenAI(
   api_key=cfg.gptkey,
@@ -10,15 +9,24 @@ gptclient = openai.OpenAI(
 isLogined = False
 gdchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?-#*()_ :;/"
 waitaftercomment = cfg.waitaftercomment
+currpath = os.path.dirname(__file__)
+validproxypath = currpath + "/valid_proxy.txt"
+allproxypath = currpath + "/proxy.txt"
 
-inputClr = colorama.Fore.MAGENTA
-errClr = colorama.Fore.RED
-warnClr = colorama.Fore.YELLOW
-succClr = colorama.Fore.GREEN
-proxClr = colorama.Fore.CYAN
-reset = colorama.Style.RESET_ALL
-
-# EiRk29wk 
+if cfg.useColors:
+  inputClr = colorama.Fore.MAGENTA
+  errClr = colorama.Fore.RED
+  warnClr = colorama.Fore.YELLOW
+  succClr = colorama.Fore.GREEN
+  proxClr = colorama.Fore.CYAN
+  reset = colorama.Style.RESET_ALL
+else:
+  inputClr = ""
+  errClr = ""
+  warnClr = ""
+  succClr = ""
+  proxClr = ""
+  reset = ""
 
 async def login():
   await getProxy()
@@ -54,7 +62,7 @@ async def askGpt(prompt):
 
 async def checkProxy(): # check if proxy is valid on boomlings
   print("Starting check...")
-  with open('proxy.txt', 'r') as file:
+  with open(allproxypath, 'r') as file:
     allprox = [line.strip() for line in file]
     
   valids = []
@@ -81,13 +89,14 @@ async def checkProxy(): # check if proxy is valid on boomlings
       
     print(f"Elapsed time: {elapsed_time:.2f} seconds\nAverage time per proxy: {average_time:.2f} seconds \nRemaining time: {average_time * (totalCnt - checkedCnt):.2f} seconds \n --------- \n")
 
-  with open('valid_proxy.txt', 'w') as file:
+  with open(validproxypath, 'w') as file:
     file.write('\n'.join(valids))
 
   print(f"Valid proxies: {valids}")
+  input(inputClr + "Enter to exit" + reset)
     
 async def getProxy():
-  with open("valid_proxy.txt", "r") as file:
+  with open(validproxypath, "r") as file:
       proxies = file.readlines()
   randproxy = random.choice(proxies).strip()
   print(proxClr + "Using proxy: " + randproxy + reset)
@@ -132,8 +141,12 @@ async def getRecent():
       await getProxy()
 
 async def main():
+  if cfg.username == "none" or cfg.password == "none" or cfg.gptkey == "none" or cfg.gptbase == "none":
+    print(f"{errClr}Configure config.py ({inputClr}username, password, gptkey, gptbase{errClr} is required){reset}")
+    time.sleep(3)
+    return
   await login()
-  loopcount = input(inputClr + "Enter loop count: " + colorama.Style.RESET_ALL)
+  loopcount = input(inputClr + "Enter loop count: " + reset)
   if not loopcount.isdigit():
     print(errClr + "Not int" + reset)
     time.sleep(3)
@@ -162,11 +175,15 @@ async def main():
       time.sleep(waitaftercomment)
     
   print(succClr + "\n Done! \n Thanks for using GDNerd :) " + reset)
-  time.sleep(5)
+  input(inputClr + "Enter to exit" + reset)
+  
+def clearConsole():
+  os.system('cls' if os.name == 'nt' else 'clear')
   
 async def modeSwitcher():
   while True:
-    print("Choose mode:")
+    clearConsole()
+    print(f"\n\n{succClr}Welcome to GDNerd, made by Vustur. {reset}\nChoose mode:")
     print("[1] Start GDNerd on recents")
     print("[9] Check proxies\n")
     choose = input(inputClr + "Mode: " + reset)
@@ -177,6 +194,6 @@ async def modeSwitcher():
         await checkProxy()
       case _:
         print(errClr + "Wrong mode" + reset)
-        time.sleep(3)
+        time.sleep(1.5)
 
 asyncio.run(modeSwitcher())

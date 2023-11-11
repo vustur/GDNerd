@@ -4,7 +4,7 @@ Python program for spamming geometry dash recent level with chatGPT!
 - Login to gd account
 - Get random recent level
 - Get levels name, description, author and song
-- Ask ChatGpt with [prompt and level data](main.py#L144)
+- Ask ChatGpt with [prompt and level data](main.py#L159)
 - Comment strange thing
 ### Install
 - copy repo
