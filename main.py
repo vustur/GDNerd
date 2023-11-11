@@ -1,9 +1,12 @@
 import openai, json, gd, os, random, asyncio, time, colorama
-import config.py as cfg
+import config as cfg
 
-openai.api_key = cfg.gptkey
 openai.api_base = cfg.gptbase
 client = gd.Client()
+gptclient = openai.OpenAI(
+  api_key=cfg.gptkey,
+  base_url=cfg.gptbase
+)
 isLogined = False
 gdchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?-#*()_ :;/"
 waitaftercomment = cfg.waitaftercomment
@@ -34,7 +37,7 @@ async def login():
 
 async def askGpt(prompt):
   try:
-    req = openai.ChatCompletion.create(
+    req = gptclient.chat.completions.create(
       stream = False,
       model = "gpt-3.5",
       messages=[
@@ -44,8 +47,7 @@ async def askGpt(prompt):
           }
       ]
     )
-    rp = req.choices[0].message.content
-    return rp
+    return req.choices[0].message.content
   except Exception as Err:
     print(errClr + "Error while asking GPT: " + str(Err) + reset)
     return "error"
@@ -130,6 +132,7 @@ async def getRecent():
       await getProxy()
 
 async def main():
+  await login()
   loopcount = input(inputClr + "Enter loop count: " + colorama.Style.RESET_ALL)
   if not loopcount.isdigit():
     print(errClr + "Not int" + reset)
@@ -163,18 +166,17 @@ async def main():
   
 async def modeSwitcher():
   while True:
-    print("Choose option")
-    print("[1] Start GDNerd")
-    print("[2] Check proxies\n")
+    print("Choose mode:")
+    print("[1] Start GDNerd on recents")
+    print("[9] Check proxies\n")
     choose = input(inputClr + "Mode: " + reset)
-    if choose == "2":
-      await checkProxy()
-    elif choose == "1":
-      await login()
-      await main()
-    else:
-      print(errClr + "Invalid option" + reset)
+    match choose:
+      case "1":
+        await main()
+      case "9":
+        await checkProxy()
+      case _:
+        print(errClr + "Wrong mode" + reset)
+        time.sleep(3)
 
 asyncio.run(modeSwitcher())
-
-# ftp test!!
