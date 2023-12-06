@@ -7,7 +7,7 @@ gptclient = openai.OpenAI(
   base_url=cfg.gptbase
 )
 isLogined = False
-gdchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?-#*()_ :;/"
+gdchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?-#*()_ :;/" # Other characters will be removed
 waitaftercomment = cfg.waitaftercomment
 currpath = os.path.dirname(__file__)
 validproxypath = currpath + "/valid_proxy.txt"
@@ -47,7 +47,7 @@ async def askGpt(prompt):
   try:
     req = gptclient.chat.completions.create(
       stream = False,
-      model = "gpt-3.5",
+      model = cfg.gptmodel,
       messages=[
         {
           "role": "user",
@@ -76,8 +76,8 @@ async def checkProxy(): # check if proxy is valid on boomlings
     print(f" --------- \nChecking proxy: " + proxClr + f"{proxy}" + reset)
     try:
       client.http.proxy = proxy
-      level = await client.get_level(128)
-      print(succClr + f"Proxy is valid: {proxy} ({level.name} should be 1st level)")
+      await asyncio.wait_for(client.get_level(128), timeout=8)
+      print(succClr + f"Proxy is valid: {proxy}")
       validCnt += 1
       print(f" ++++ {reset}Total valid is {validCnt} / {totalCnt} \n")
       valids.append(proxy)
@@ -103,15 +103,24 @@ async def getProxy():
   client.http.proxy = randproxy
 
 async def commentLevel(lvlid, comment):
-  for i in range(5):
+  isSucc = False
+  for i in range(2):
     if not isLogined:
       await login()
     print("Commenting " + str(lvlid) + " with comment: " + comment)
     try:
       level = await client.get_level(lvlid)
-      await client.comment_level(level, comment, random.randint(20, 85))
+      await asyncio.wait_for(client.comment_level(level, comment, random.randint(20, 85)), timeout=cfg.maxWaitTime)
       print(succClr + "Commented!" + reset)
-      break  # Exit the loop if commenting is successful
+      isSucc = True  
+      return isSucc # Exit the loop if commenting is successful
+    except gd.MissingAccess as Err:
+      print(errClr + "GD Error! (Probably commenting too fast, empty comment or level delated) : " + str(Err) + "  Nothing to do.. Skipping" + reset)
+      return isSucc
+    except asyncio.TimeoutError:
+      print(errClr + "Commenting timed out (proxy is " + client.http.proxy + ")")
+      print("Retrying..." + reset)
+      await getProxy()
     except Exception as Err:
       print(errClr + "Error while commenting: " + str(Err))
       print("Retrying..." + reset)
@@ -128,6 +137,7 @@ async def getRecent():
       lvlid = recentlvls[0].id
       print(succClr + "Getting level: " + str(lvlid) + reset)
       level = await client.get_level(lvlid)
+      await asyncio.wait_for(client.get_level(lvlid), timeout=cfg.maxWaitTime)
       levelname = level.name
       leveldesc = level.description
       levelsongname = level.song.name
@@ -135,12 +145,17 @@ async def getRecent():
       levelcreator = level.creator.name
       levellenght = level.length
       return {"level": level, "name": levelname, "desc": leveldesc, "song": levelsongname, "songid": levelsongid, "creator": levelcreator, "length": levellenght}
+    except asyncio.TimeoutError:
+      print(errClr + "Getting recent timed out (proxy is " + client.http.proxy + ")")
+      print("Retrying..." + reset)
+      await getProxy()
     except Exception as Err:
       print(errClr + "Error occurred on getting recent: " + str(Err))
       print("Retrying..." + reset)
       await getProxy()
 
 async def main():
+  succLoops = 0
   if cfg.username == "none" or cfg.password == "none" or cfg.gptkey == "none" or cfg.gptbase == "none":
     print(f"{errClr}Configure config.py ({inputClr}username, password, gptkey, gptbase{errClr} is required){reset}")
     time.sleep(3)
@@ -153,10 +168,10 @@ async def main():
     return
   loopcount = int(loopcount)
   for i in range(loopcount):
-    print(inputClr + "Loop: " + str(i + 1) + " / " + str(loopcount) + reset)
+    print(inputClr + "Loop: " + str(i + 1) + " / Succ: " + str(succLoops) + " / " + str(loopcount) + reset)
     lvl = await getRecent()
     print(" ------------\n Data: \n - Name: " + lvl['name'] + "\n - Creator: " + lvl['creator'] + "\n - Description: " + lvl['desc'] + "\n - Length: " + str(lvl['length']) + "\n - Song: " + lvl['song'] + " (" + str(lvl['songid']) + ")\n ")
-    prompt = f"You are going to comment geometry dash (game) level! You should write a very funny and ORIGINAL (it should not look like your other comments!) joke or comment about the level with name {lvl['name']} created by {lvl['creator']} with description '{lvl['desc']}' and song {lvl['song']} like you are beginner player. REMEMBER: your joke or comment should be not longer than 100 characters, so it should be very short (geometry dash limit)! Your joke or comment also should be funny, include something about name, description or song and not look like it was written by chat gpt. You can use some of this words (NOT ALL IN ONE joke or comment): ship, ball, cube, wave, ufo, hardest part, straightfly, spikes, blockdesign, deco, GD (short name of game), other players, robtop(gd developer), rate(process when gd level get stars by moderators). Example: 'Actually good level! Ball part was so cool' REMEMBER: your joke or comment should be not longer than 100 chars, so it should be very short (geometry dash limit), include something about name, description or song and it should be original(not like 'wild ride' or 'rollercoaster')! MOST IMPORTANT RULE: YOU SHOULD JUST RETURN A joke or comment WITHOUT CONTEXT"
+    prompt = f"You are going to comment geometry dash (game) level! You should write a very funny and ORIGINAL (it should not look like your other comments!) joke or comment about the level with name {lvl['name']} created by {lvl['creator']} with description '{lvl['desc']}' and song {lvl['song']} like you are beginner player. REMEMBER: your joke or comment should be not longer than 100 characters, so it should be very short (geometry dash limit)! Your joke or comment also should be funny, include something about name, description or song and not look like it was written by chat gpt. You can use some of this words (NOT ALL IN ONE joke or comment): ship, ball, cube, wave, ufo, hardest part, straightfly, spikes, blockdesign, deco, GD (short name of game), other players, robtop(gd developer), rate(process when gd level get stars by moderators), touch grass, vsc (hardest wave level), stereo madness(first main geometry dash level), back on track(second main geometry dash level), version 2.2(upcoming geometry dash version, not releasing in 8 years). Example: 'Actually good level! Ball part was so cool' REMEMBER: your joke or comment should be not longer than 100 chars, so it should be very short (geometry dash limit), include something about name, description or song and it should be original(not like 'wild ride' or 'rollercoaster')! MOST IMPORTANT RULE: YOU SHOULD JUST RETURN A joke or comment WITHOUT CONTEXT"
     response = await askGpt(prompt)
     if response == "error":
       print(errClr + "Error with response. Level skipped" + reset)
@@ -169,10 +184,17 @@ async def main():
     if response.startswith("Comment: "):
       response = response[9:]
     print("Response (for GD): " + response)
-    await commentLevel(lvl['level'].id, response)
-    if waitaftercomment > 0 and i != loopcount:
+    isCommented = await commentLevel(lvl['level'].id, response)
+    if isCommented:
+      print(succClr + "Look like everything is fine.." + reset)
+      succLoops += 1
+    else:
+      print(errClr + "Something went wrong with commenting.." + reset)
+    if waitaftercomment > 0 and i != loopcount and isCommented:
       print(" ------------ \n Waiting " + str(waitaftercomment) + " seconds to continue...")
       time.sleep(waitaftercomment)
+    elif waitaftercomment > 0 and i != loopcount and not isCommented:
+      print(" ------------ \n Comment not posted, so no need to wait...")
     
   print(succClr + "\n Done! \n Thanks for using GDNerd :) " + reset)
   input(inputClr + "Enter to exit" + reset)
